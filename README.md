@@ -1,6 +1,6 @@
-# vinext-starter
+# Task Management Solution
 
-A clean full-stack starter running on
+A private task board application running on
 [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
 Drizzle support.
 

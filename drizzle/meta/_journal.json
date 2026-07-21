@@ -8,6 +8,13 @@
       "when": 1784629494664,
       "tag": "0000_far_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1784636614445,
+      "tag": "0001_mean_hellcat",
+      "breakpoints": true
     }
   ]
 }

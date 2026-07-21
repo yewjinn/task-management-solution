@@ -8,6 +8,7 @@ type ListRow = {
 
 type CardRow = {
   id: string;
+  task_number: number | null;
   list_id: string;
   title: string;
   notes: string;
@@ -56,6 +57,7 @@ async function ensureSchema() {
       db.prepare(
         `CREATE TABLE IF NOT EXISTS cards (
           id TEXT PRIMARY KEY NOT NULL,
+          task_number INTEGER,
           list_id TEXT NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
           title TEXT NOT NULL,
           notes TEXT NOT NULL DEFAULT '',
@@ -75,7 +77,61 @@ async function ensureSchema() {
       ),
       db.prepare("CREATE INDEX IF NOT EXISTS cards_due_date_idx ON cards (due_date)"),
     ])
-    .then(() => undefined)
+    .then(async () => {
+      const columns = await db.prepare("PRAGMA table_info(cards)").all<{
+        name: string;
+      }>();
+
+      if (!columns.results.some((column) => column.name === "task_number")) {
+        await db
+          .prepare("ALTER TABLE cards ADD COLUMN task_number INTEGER")
+          .run();
+      }
+
+      const maximum = await db
+        .prepare("SELECT COALESCE(MAX(task_number), 0) AS value FROM cards")
+        .first<{ value: number }>();
+      let lastTaskNumber = Number(maximum?.value ?? 0);
+      const unnumbered = await db
+        .prepare(
+          `SELECT id FROM cards
+           WHERE task_number IS NULL
+           ORDER BY created_at, id`,
+        )
+        .all<{ id: string }>();
+
+      if (unnumbered.results.length) {
+        await db.batch(
+          unnumbered.results.map((card) =>
+            db
+              .prepare("UPDATE cards SET task_number = ? WHERE id = ?")
+              .bind(++lastTaskNumber, card.id),
+          ),
+        );
+      }
+
+      await db
+        .prepare(
+          "CREATE UNIQUE INDEX IF NOT EXISTS cards_task_number_idx ON cards (task_number)",
+        )
+        .run();
+
+      const sequence = await db
+        .prepare("SELECT value FROM board_settings WHERE key = ?")
+        .bind("last_task_number")
+        .first<{ value: string }>();
+      if (!sequence) {
+        await db
+          .prepare("INSERT INTO board_settings (key, value) VALUES (?, ?)")
+          .bind("last_task_number", String(lastTaskNumber))
+          .run();
+      } else if (Number(sequence.value) < lastTaskNumber) {
+        await db
+          .prepare("UPDATE board_settings SET value = ? WHERE key = ?")
+          .bind(String(lastTaskNumber), "last_task_number")
+          .run();
+      }
+    })
     .catch((error) => {
       schemaReady = null;
       throw error;
@@ -161,7 +217,7 @@ async function readBoard() {
       .all<ListRow>(),
     db
       .prepare(
-        `SELECT id, list_id, title, notes, due_date, priority, effort, tags,
+        `SELECT id, task_number, list_id, title, notes, due_date, priority, effort, tags,
                 position, completed, created_at, updated_at
          FROM cards ORDER BY list_id, position, created_at`,
       )
@@ -188,6 +244,7 @@ async function readBoard() {
 function presentCard(card: CardRow) {
   return {
     id: card.id,
+    taskNumber: card.task_number,
     listId: card.list_id,
     title: card.title,
     notes: card.notes,
@@ -223,6 +280,21 @@ async function maxPosition(table: "lists" | "cards", listId?: string) {
         .prepare(`SELECT COALESCE(MAX(position), 0) AS position FROM ${table}`)
         .first<{ position: number }>();
   return Number(result?.position ?? 0);
+}
+
+async function nextTaskNumber() {
+  const db = await database();
+  const result = await db
+    .prepare(
+      `UPDATE board_settings
+       SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)
+       WHERE key = ?
+       RETURNING CAST(value AS INTEGER) AS value`,
+    )
+    .bind("last_task_number")
+    .first<{ value: number }>();
+  if (!result) throw new Error("A task number could not be assigned.");
+  return Number(result.value);
 }
 
 async function handleAction(payload: Record<string, unknown>) {
@@ -287,12 +359,13 @@ async function handleAction(payload: Record<string, unknown>) {
     await db
       .prepare(
         `INSERT INTO cards
-          (id, list_id, title, notes, due_date, priority, effort, tags, position,
-           completed, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, task_number, list_id, title, notes, due_date, priority, effort, tags,
+           position, completed, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         crypto.randomUUID(),
+        await nextTaskNumber(),
         listId,
         title,
         cleanText(payload.notes, 4000),
@@ -313,7 +386,7 @@ async function handleAction(payload: Record<string, unknown>) {
     const id = cleanText(payload.id, 80);
     const current = await db
       .prepare(
-        `SELECT id, list_id, title, notes, due_date, priority, effort, tags,
+        `SELECT id, task_number, list_id, title, notes, due_date, priority, effort, tags,
                 position, completed, created_at, updated_at
          FROM cards WHERE id = ?`,
       )

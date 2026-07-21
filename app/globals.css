@@ -38,6 +38,7 @@ body {
     var(--canvas);
   color: var(--ink);
   font-family: var(--font-geist-sans), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
 }
 
 button,
@@ -530,6 +531,15 @@ select:focus-visible,
   text-decoration-thickness: 1px;
 }
 
+.task-number {
+  display: block;
+  margin: 0 0 7px 28px;
+  color: var(--teal-dark);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 .card-topline {
   display: flex;
   align-items: flex-start;
@@ -951,6 +961,30 @@ select:focus-visible,
 
 @keyframes shimmer {
   to { background-position: -200% 0; }
+}
+
+/* Keep all visible supporting text comfortably readable. */
+.topbar p,
+.save-state,
+.filter-strip label,
+.clear-filter,
+.count-badge,
+.icon-button,
+.popover-menu button,
+.complete-button,
+.card-note,
+.tag-row span,
+.due-label,
+.effort-label,
+.priority-badge,
+.empty-list,
+.inline-add input,
+.inline-add .detail-add,
+.eyebrow,
+.field,
+.field small,
+.complete-toggle {
+  font-size: 13px;
 }
 
 @media (max-width: 1050px) {

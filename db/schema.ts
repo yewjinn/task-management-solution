@@ -1,4 +1,10 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 export const boardSettings = sqliteTable("board_settings", {
   key: text("key").primaryKey(),
@@ -21,6 +27,7 @@ export const cards = sqliteTable(
   "cards",
   {
     id: text("id").primaryKey(),
+    taskNumber: integer("task_number"),
     listId: text("list_id")
       .notNull()
       .references(() => lists.id, { onDelete: "cascade" }),
@@ -36,6 +43,7 @@ export const cards = sqliteTable(
     updatedAt: text("updated_at").notNull(),
   },
   (table) => [
+    uniqueIndex("cards_task_number_idx").on(table.taskNumber),
     index("cards_list_position_idx").on(table.listId, table.position),
     index("cards_due_date_idx").on(table.dueDate),
   ],

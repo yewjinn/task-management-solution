@@ -13,6 +13,7 @@ type Effort = "small" | "medium" | "large";
 
 type TaskCard = {
   id: string;
+  taskNumber: number;
   listId: string;
   title: string;
   notes: string;
@@ -91,7 +92,15 @@ function taskMatches(
   due: string,
 ) {
   const query = search.toLowerCase().trim();
-  const haystack = [card.title, card.notes, ...card.tags].join(" ").toLowerCase();
+  const haystack = [
+    `task ${card.taskNumber}`,
+    `task #${card.taskNumber}`,
+    card.title,
+    card.notes,
+    ...card.tags,
+  ]
+    .join(" ")
+    .toLowerCase();
   if (query && !haystack.includes(query)) return false;
   if (priority !== "all" && card.priority !== priority) return false;
   if (effort !== "all" && card.effort !== effort) return false;
@@ -618,6 +627,7 @@ export default function TaskBoard() {
                         onDrop={(event) => void dropOnCard(event, list.id, card.id)}
                         onClick={() => openCard(card)}
                       >
+                        <span className="task-number">Task #{card.taskNumber}</span>
                         <div className="card-topline">
                           <button
                             className={card.completed ? "complete-button checked" : "complete-button"}
@@ -690,7 +700,11 @@ export default function TaskBoard() {
           <section className="modal card-modal" role="dialog" aria-modal="true" aria-labelledby="card-dialog-title" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <span className="eyebrow">{cardDraft.id ? "Task details" : "New task"}</span>
+                <span className="eyebrow">
+                  {cardDraft.id
+                    ? `Task #${allCards.find((card) => card.id === cardDraft.id)?.taskNumber ?? ""}`
+                    : "New task"}
+                </span>
                 <h2 id="card-dialog-title">{cardDraft.id ? "Edit task" : "Add a task"}</h2>
               </div>
               <button type="button" className="close-button" onClick={() => setCardDraft(null)} aria-label="Close">×</button>
